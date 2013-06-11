@@ -1,39 +1,57 @@
 Sorry for my poor English. If you can help with improving the English in this
 documentation, please contact me.
 
-## MyMySQL v0.4.7 (2012-05-14)
+## MyMySQL v1.4 (2013-03-04)
 
-This package contains MySQL client API written entirely in Go. It works with
-the MySQL protocol version 4.1 or greater. It definitely works well with MySQL
-5.0 and 5.1 (I use these versions of MySQL servers for my applications).
+This package contains MySQL client API written entirely in Go. It is designed
+to work with the MySQL protocol version 4.1 or greater. It definitely works
+well with MySQL server version 5.0 and 5.1 (I use these versions of MySQL
+servers for my applications). Some people claim that mymysql works with older
+versions of MySQL protocol too.
 
 ## Changelog
 
-#### v0.4.7
+v1.4: `Stmt.ResetParams`, `Stmt.Map` and `Stmt.NumFields` methods disappeared.
+New `Stmt.Fields` method. *godrv* implements `driver.Queryer` interface which
+improves performance when compiled with Go tip.
 
-ScanRow and MakeRow methods addad. ScanRow is more efficient than GetRow because
-it doesn't allocate memory for every row received from the server. *godrv*
-Value.Next method now uses the new ScanRow method.
+v1.3: Overall performance improved by factor 1.5 to 1.8. All Encode* functions
+now accept properly sized `[]byte` slice as first argument.
 
-#### v0.4.6
+v1.2: Faster execution of simple queries in *mymysql/godrv*. `EscapeString`
+method renamed to `Escape`.
 
-StatusOnly method added to mysql.Result.
+v1.1: Client error codes moved from *mymysql/native* pacage to *mymysql/mysql*.
 
-#### v0.4.5
+v1.0: Transactions added to autorc, new Transaction.IsValid method. I think
+this library is mature enough to release it as v1.0
 
-New autorc.Conn.PrepareOnce method.
+v0.4.11: Add Reconnect, Register, SetMaxPktSize, Bind to autorc.
 
-#### v0.4.4
+v0.4.10: New *Clone* method for create connection from other connection.
+
+v0.4.9: New method for create connection from configuration in file: *NewFromCF*.
+
+v0.4.8: New methods for obtain only first/last row from result set. Better
+implementation of discarding rows in End method.
+
+v0.4.7: ScanRow and MakeRow methods addad. ScanRow is more efficient than GetRow because it doesn't allocate memory for every row received from the server. *godrv* Value.Next method now uses the new ScanRow method.
+
+v0.4.6: StatusOnly method added to mysql.Result.
+
+v0.4.5: New autorc.Conn.PrepareOnce method.
+
+v0.4.4:
 
 1. Row.Int, Row.Uint, Row.Int64, ... methods now panic in case of error.
 2. New Row.Float method.
 
-#### v0.4.3
+v0.4.3:
 
 1. Fixed issue with panic when the server returns MYSQL_TYPE_NEWDECIMAL.
 2. Decimals are returned as float64 (previously they were returned as []byte).
 
-#### v0.4.2
+v0.4.2:
 
 1. A lot of changes with MySQL time handling:
 
@@ -45,11 +63,11 @@ New autorc.Conn.PrepareOnce method.
 
 3. Rename BindParams to Bind.
 
-#### v0.4.1
+v0.4.1:
 
 BindParams supports Go bool type. 
 
-#### v0.4
+v0.4:
 
 1. Modular design:
 
@@ -85,7 +103,7 @@ For testing you will need to create the test database and a test user:
 
 	mysql> create database test;
 	mysql> grant all privileges on test.* to testuser@localhost;
-	mysql> set password for testuser@localhost = password("TestPasswd9")
+	mysql> set password for testuser@localhost = password("TestPasswd9");
 
 Make sure that MySQL *max_allowed_packet* variable in *my.cnf* is equal or greater than 34M (In order to test long packets).
 
@@ -163,12 +181,12 @@ If you do not want to load the entire result into memory you may use
 	// Print all rows
 	for {
 		row, err := res.GetRow()
-		checkError(err)
+			checkError(err)
 
-		if row == nil {
-			// No more rows
-			break
-		}
+			if row == nil {
+				// No more rows
+				break
+			}
 
 		// Print all cols
 		for _, col := range row {
@@ -191,8 +209,8 @@ unnecessary allocations:
 	for {
 		err := res.ScanRow(row)
 		if err == io.EOF {
-			// No more rows
-			break
+			 // No more rows
+			 break
 		}
 		checkError(err)
 
@@ -218,7 +236,7 @@ You can use *Run* or *Exec* method for prepared statements:
 	for {
 		err := getData(data)
 		if err == endOfData {
-			break       
+			 break       
 		}
 		checkError(err)
 
@@ -263,7 +281,7 @@ This is the improved code of the previous example:
 	for {
 		err := getData(data)
 		if isEndOfData(error) {
-			break       
+			 break       
 		}
 		checkError(err)
 
@@ -374,7 +392,7 @@ This is the improved code of the previous example:
 	// to the transaction before using it.
 	_, err = tr.Do(ins).Run(3, "three")
 	checkError(err)
-
+	
 	// For a greater number of calls
 	ti := tr.Do(ins)
 	_, err = ti.Run(4, "four")
@@ -398,7 +416,7 @@ This is the improved code of the previous example:
 	db := autorc.New("tcp", "", "127.0.0.1:3306", user, pass, dbname)
 
 	// Initilisation commands. They will be executed after each connect.
-	db.Raw.Register("set names utf8")
+	db.Register("set names utf8")
 
 	// There is no need to explicity connect to the MySQL server
 	rows, res, err := db.Query("SELECT * FROM R")
@@ -420,7 +438,7 @@ This is the improved code of the previous example:
 	checkError(err)
 
 	// But it doesn't matter
-	sel.Raw.Bind(2)
+	sel.Bind(2)
 	rows, res, err = sel.Exec()
 	checkError(err)
 
@@ -434,7 +452,15 @@ This is the improved code of the previous example:
 	// local server using default protocol). Currently possible forms:
 	//   DBNAME/USER/PASSWD
 	//   unix:SOCKPATH*DBNAME/USER/PASSWD
+	//   unix:SOCKPATH,OPTIONS*DBNAME/USER/PASSWD
 	//   tcp:ADDR*DBNAME/USER/PASSWD
+	//   tcp:ADDR,OPTIONS*DBNAME/USER/PASSWD
+	//
+	// OPTIONS can contain comma separated list of options in form:
+	//   opt1=VAL1,opt2=VAL2,boolopt3,boolopt4
+	// Currently implemented options:
+	//   laddr   - local address/port (eg. 1.2.3.4:0)
+	//   timeout - connect timeout in format accepted by time.ParseDuration
 
 	// Register initialisation commands
 	// (workaround, see http://codereview.appspot.com/5706047)
@@ -496,6 +522,41 @@ This is the improved code of the previous example:
 		if res == nil {
 			panic("nil result from procedure")
 		}
+	}
+
+### Example 9 - transactions using autorc
+
+	import (
+		"github.com/ziutek/mymysql/autorc"
+		_ "github.com/ziutek/mymysql/thrsafe" // You may also use the native engine
+	)
+
+	// [...]
+
+	db := autorc.New("tcp", "", "127.0.0.1:3306", user, pass, dbname)
+
+	var stmt1, stmt2 autorc.Stmt
+
+	func updateDb() {
+		err := db.PrepareOnce(&stmt1, someSQL1)
+		checkDbErr(err)
+		err = db.PrepareOnce(&stmt2, someSQL2)
+		checkDbErr(err)
+
+		err = db.Begin(func(tr mysql.Transaction, args ...interface{}) error {
+			// This function will be called again if returns a recoverable error
+			s1 := tr.Do(stmt1.Raw)
+			s2 := tr.Do(stmt2.Raw)
+			if _, err := s1.Run(); err != nil {
+				return err
+			}
+			if _, err := s2.Run(); err != nil {
+				return err
+			}
+			// You have to commit or rollback before return
+			return tr.Commit()
+		})
+		checkDbErr(err)
 	}
 
 Additional examples are in *examples* directory.
@@ -610,11 +671,11 @@ application befor put it into production. There is example output from siege:
 	# siege my.httpserver.pl -c25 -d0 -t 30s
 	** SIEGE 2.69
 	** Preparing 25 concurrent users for battle.
-	The server is now under siege...
+    The server is now under siege...
 	Lifting the server siege..      done.
-	Transactions:                   3212 hits
-	Availability:                 100.00 %
-	Elapsed time:                  29.83 secs
+    Transactions:                   3212 hits
+    Availability:                 100.00 %
+    Elapsed time:                  29.83 secs
 	Data transferred:               3.88 MB
 	Response time:                  0.22 secs
 	Transaction rate:             107.68 trans/sec
@@ -627,8 +688,7 @@ application befor put it into production. There is example output from siege:
 
 ## To do
 
-1. Transactions in auto reconnect interface.
-2. Complete documentation
+1. Complete documentation
 
 ## Known bugs
 
